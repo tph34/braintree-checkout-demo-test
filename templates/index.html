@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Braintree One-Time Checkout Demo</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://js.braintreegateway.com/web/dropin/1.45.0/js/dropin.min.js"></script>
+</head>
+<body>
+  <main class="card">
+    <h1>Braintree Checkout Demo</h1>
+    <p>Enter an amount and test payment using Braintree Sandbox cards.</p>
+
+    <label for="amount">Amount (USD)</label>
+    <input id="amount" type="number" step="0.01" placeholder="10.00" value="10.00">
+
+    <div id="dropin-container"></div>
+
+    <button id="pay-button">Click Here to Pay</button>
+
+    <div id="status" aria-live="polite"></div>
+
+    <section class="test-cards">
+      <h3>Sandbox Test Cards</h3>
+      <ul>
+        <p>Click the link below to get test card details for testing</p>
+        <p><a href="https://developer.paypal.com/braintree/docs/reference/general/testing/python#valid-card-numbers">Paypal Test Cards</a></p>
+        <p><a href="https://developer.paypal.com/braintree/docs/reference/general/testing/python#transaction-amounts">Test amount to determine Transaction success</a></p>
+      </ul>
+      
+    </section>
+  </main>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const payBtn = document.getElementById('pay-button');
+    let dropinInstance = null;
+
+    function showStatus(msg, isError=false) {
+      statusEl.textContent = msg;
+      statusEl.className = isError ? 'status error' : 'status success';
+    }
+
+    fetch('/token')
+      .then(r => r.json())
+      .then(data => {
+        if (data.token) {
+          return braintree.dropin.create({
+            authorization: data.token,
+            container: '#dropin-container'
+          });
+        } else {
+          throw new Error(data.error || 'No token returned');
+        }
+      })
+      .then(instance => {
+        dropinInstance = instance;
+        showStatus('Ready — enter amount and click Pay Now');
+      })
+      .catch(err => {
+        showStatus('Error initializing payment UI: ' + err.message, true);
+        console.error(err);
+      });
+
+    payBtn.addEventListener('click', function() {
+      if (!dropinInstance) {
+        showStatus('Payment UI not ready', true);
+        return;
+      }
+      const amount = document.getElementById('amount').value;
+      if (!amount || parseFloat(amount) <= 0) {
+        showStatus('Please enter a valid amount', true);
+        return;
+      }
+
+      showStatus('Processing payment — please wait...');
+
+      dropinInstance.requestPaymentMethod(function(err, payload) {
+        if (err) {
+          showStatus('Error requesting payment method: ' + err.message, true);
+          return;
+        }
+
+        fetch('/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            payment_method_nonce: payload.nonce,
+            amount: amount
+          })
+        })
+        .then(r => r.json())
+        .then(res => {
+          if (res.success) {
+            showStatus('✅ Payment Successful! Transaction ID: ' + res.transaction_id);
+          } else {
+            let errMsg = res.error || 'Transaction failed';
+            if (res.errors && res.errors.length) {
+              errMsg += ' — ' + res.errors.join('; ');
+            }
+            showStatus('❌ Payment Failed: ' + errMsg, true);
+          }
+        })
+        .catch(e => {
+          showStatus('Network or server error: ' + e.message, true);
+        });
+      });
+    });
+  </script>
+</body>
+</html>
