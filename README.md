@@ -42,7 +42,7 @@ This is a full-stack demo web app showcasing a one-time checkout flow using Brai
 
 ## Sandbox test cards
 - Success: `4111 1111 1111 1111`
-- Failure: `4000 0000 0000 0002`
+- Failure: See the transaction amount here: https://developer.paypal.com/braintree/docs/reference/general/testing/python#transaction-amounts
 Use any future expiry and any cvv.
 
 ## How I prepared this
